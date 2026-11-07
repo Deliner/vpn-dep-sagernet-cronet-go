@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Regression for chromium crbug.com/572055997. A 206 response must not deliver
-// bytes beyond its Content-Range, with either cacheable or no-store responses.
+// Regression for chromium crbug.com/572055997 using valid chunked HTTP framing.
+// The cache must not deliver bytes beyond its Content-Range, with or without storage.
 func TestRangeResponseBoundaries(t *testing.T) {
 	path := os.Getenv("NHOP_CRONET_LIBRARY")
 	if path == "" {
@@ -76,8 +76,16 @@ func readRange(t *testing.T, transport *cronet.RoundTripper, noStore, split, ext
 		require.Equal(t, "0123456789", string(first))
 	}
 	rest, err := io.ReadAll(response.Body)
+	checkRangeRead(t, first, rest, err, split, extra)
+}
+
+func checkRangeRead(t *testing.T, first, rest []byte, err error, split, extra bool) {
+	t.Helper()
 	if extra {
-		if err == nil || !strings.Contains(err.Error(), "CONTENT_LENGTH_MISMATCH") {
+		// URLRequestHttpJob clears this error after exactly the advertised range
+		// was delivered; the public API must still expose ZERO excess bytes.
+		if len(rest) != 0 || (!split && (err == nil || !strings.Contains(err.Error(), "CONTENT_LENGTH_MISMATCH"))) ||
+			(split && err != nil && !strings.Contains(err.Error(), "CONTENT_LENGTH_MISMATCH")) {
 			t.Errorf("overlong range accepted: first=%q rest=%q error=%v", first, rest, err)
 		}
 	} else {
@@ -93,13 +101,15 @@ func rangeServer(noStore, extra bool) *httptest.Server {
 			body += "extra-data"
 		}
 		writer.Header().Set("Content-Range", "bytes 0-9/80")
-		writer.Header().Set("Content-Length", fmt.Sprint(len(body)))
+		// Stream chunks so HTTP framing does not preempt the cache range check.
+		// A contradictory Content-Length makes PartialData bypass the tested path.
 		writer.Header().Set("ETag", "\"range-fixture\"")
 		writer.Header().Set("Cache-Control", "max-age=600")
 		if noStore {
 			writer.Header().Set("Cache-Control", "no-store")
 		}
 		writer.WriteHeader(http.StatusPartialContent)
+		writer.(http.Flusher).Flush()
 		_, _ = io.WriteString(writer, body)
 	}))
 }
