@@ -1,8 +1,8 @@
-# Maintained Go wrapper source
+# Maintained Cronet source
 
 This branch starts at SagerNet/cronet-go commit
 `095cb9e060468c80ca31d977c020dca82d101a8f` (Chromium 154 generation).
-The Go wrapper implementation and its module requirements are unchanged.
+The Go wrapper runtime implementation and its module requirements are unchanged.
 Upstream history and licenses remain available through the parent commit.
 
 The `lib/*` native binary modules and `all` aggregation module are excluded from
@@ -12,10 +12,21 @@ caused the public Go proxy's initial fork fetch to time out. This separation
 keeps the wrapper source fetch small and makes native artifact provenance an
 explicit, separate build input.
 
-The NaiveProxy Git submodule still selects exactly
-`7c64cae24cd7bae18d9c603fdddc73b623c04462`; its URL now names our source fork.
-No native binary is rebuilt or certified by this source-only commit. Existing
-upstream native modules remain on their original commits, and native ABI,
-payload acceptance and C/C++ advisory applicability require their own checks.
+The NaiveProxy Git submodule selects our source fork at
+`7480b18651fe22eaea65bf9d3c3f7f64639b5448`, descended from the original
+`7c64cae24cd7bae18d9c603fdddc73b623c04462` snapshot. It contains six Chromium
+production backports for range validation, proxy socket/ConnectJob lifetime,
+proxy authentication endpoint selection, proxy-resolution request lifetime,
+and certificate consistency before connection-based HTTP authentication.
+Each native commit identifies the upstream fix and the limits of its tests.
+
+The Go range regression exercises full and split reads, cacheable/no-store
+responses, and positive controls through the actual native URLRequest API.
+The baseline returned bytes past the advertised range; the first four
+backports passed this regression and Naive H2/H3 TCP/UDP on AMD64 and ARM64.
+That evidence predates the last two defensive backports and does not certify
+new library bytes. Native builds, ABI/payload acceptance and the remaining
+C/C++ advisory review must run again before updating release pins.
+No native binary is rebuilt or published by this source-only commit.
 
 This change does not claim to fix the intermittent MASQUE UDP observation.
