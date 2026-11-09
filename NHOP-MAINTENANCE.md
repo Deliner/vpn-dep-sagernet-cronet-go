@@ -13,7 +13,7 @@ keeps the wrapper source fetch small and makes native artifact provenance an
 explicit, separate build input.
 
 The NaiveProxy Git submodule selects our source fork at
-`7480b18651fe22eaea65bf9d3c3f7f64639b5448`, descended from the original
+`f1e434fc78b9b1d9a04c17571984a0b6ab836d98`, descended from the original
 `7c64cae24cd7bae18d9c603fdddc73b623c04462` snapshot. It contains six Chromium
 production backports for range validation, proxy socket/ConnectJob lifetime,
 proxy authentication endpoint selection, proxy-resolution request lifetime,
@@ -30,3 +30,9 @@ C/C++ advisory review must run again before updating release pins.
 No native binary is rebuilt or published by this source-only commit.
 
 This change does not claim to fix the intermittent MASQUE UDP observation.
+
+The selected native source also backports zlib THM-ZLIB-001 to both the
+generic and Chromium SIMD decoders. The bounded source regression checks
+invalid-header/reset/dictionary handling and fixed-window controls under
+ASan/UBSan. New native libraries still require Linux AMD64/ARM64 rebuild
+and range/Naive H2/H3 acceptance before publication.
